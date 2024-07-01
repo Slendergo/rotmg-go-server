@@ -9,22 +9,25 @@ import (
 
 type Connection struct {
 	conn      net.Conn
-	connected bool
+	Connected bool
 	incoming  *network.NetworkQueue
-	World     *World
-	Player    *Player
+
+	// State
+	tickId int32
+	World  *World
+	Player *Player
 }
 
 func NewConnection(conn net.Conn) *Connection {
 	return &Connection{
 		conn:      conn,
-		connected: true,
+		Connected: true,
 		incoming:  network.NewNetworkQueue(),
 	}
 }
 
 func (c *Connection) Start() {
-	for c.connected {
+	for c.Connected {
 		payloadSize, err := c.readPayloadSize()
 		if err != nil {
 			c.Close(fmt.Sprintf("PayloadSize Read Error: %s", err.Error()))
@@ -41,6 +44,10 @@ func (c *Connection) Start() {
 		messageId := rdr.ReadByte()
 
 		m := network.NewIncomingMessage(messageId)
+		if m == nil {
+			c.Close(fmt.Sprintf("Unknown MessageId: %d", messageId))
+			break
+		}
 		m.Read(rdr)
 
 		remaining := rdr.RemainingBytes()
@@ -57,7 +64,7 @@ func (c *Connection) Start() {
 
 func (c *Connection) HandleMessages() bool {
 
-	if !c.connected {
+	if !c.Connected {
 		return false
 	}
 
@@ -104,10 +111,10 @@ func (c *Connection) readBytes(n int) ([]byte, error) {
 }
 
 func (c *Connection) Close(reason string) {
-	if !c.connected {
+	if !c.Connected {
 		return
 	}
-	c.connected = false
+	c.Connected = false
 
 	fmt.Printf("Connection was closed: %s\n", reason)
 
@@ -127,6 +134,10 @@ func (c *Connection) HandleMessage(m network.IncomingMessage) error {
 		c.HandleLoadMessage(msg)
 	case *network.CreateMessage:
 		c.HandleCreateMessage(msg)
+	case *network.MoveMessage:
+		c.HandleMoveMessage(msg)
+	case *network.UpdateAckMessage:
+		c.HandleUpdateAckMessage(msg)
 	default:
 		fmt.Println("Unknown message handler type")
 	}
@@ -167,6 +178,20 @@ func (c *Connection) HandleCreateMessage(m *network.CreateMessage) {
 	c.SendMessage(network.CreateSuccessMessage(c.Player.Id, 0))
 }
 
+func (c *Connection) HandleMoveMessage(m *network.MoveMessage) {
+
+	if !c.World.InBoundsFloat(m.NewX, m.NewY) {
+		// c.Close("Out of bounds")
+		return
+	}
+
+	c.Player.SetPosition(m.NewX, m.NewY)
+}
+
+func (c *Connection) HandleUpdateAckMessage(m *network.UpdateAckMessage) {
+
+}
+
 func (c *Connection) SendMessage(data []byte) {
 	_, err := c.conn.Write(data)
 	if err != nil {
@@ -177,9 +202,43 @@ func (c *Connection) SendMessage(data []byte) {
 // Server State
 
 func (c *Connection) NewTick(dt float64) {
+
+	c.updateSurroundings()
+
+	c.tickId++
 	tickTime := int32(dt * 1000.0)
+	c.SendMessage(network.NewTickMessage(c.tickId, tickTime))
 
 	fmt.Println("TickTime:", tickTime)
+}
 
-	_ = tickTime
+func (c *Connection) updateSurroundings() {
+	playerX := c.Player.X
+	playerY := c.Player.Y
+
+	var tiles []network.UpdateTileData
+
+	maxDistance := 15 * 15
+
+	for dx := -15; dx <= 15; dx++ {
+		for dy := -15; dy <= 15; dy++ {
+
+			if dx*dx+dy*dy >= maxDistance {
+				continue
+			}
+
+			tileX := int(playerX + float32(dx))
+			tileY := int(playerY + float32(dy))
+
+			if !c.World.InBoundsInt(tileX, tileY) {
+				continue
+			}
+
+			tile := c.World.tiles[tileX][tileY]
+
+			tiles = append(tiles, network.UpdateTileData{X: int16(tileX), Y: int16(tileY), Type: uint16(tile.Type)})
+		}
+	}
+
+	c.SendMessage(network.UpdateMessage(tiles, []int32{}, []int32{}))
 }

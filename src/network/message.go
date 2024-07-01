@@ -82,7 +82,7 @@ const (
 	Unused78               = byte(78)
 	PasswordPrompt         = byte(79)
 	AcceptArenaDeath       = byte(80)
-	Unused81               = byte(81)
+	UpdateAck              = byte(81)
 	Unused82               = byte(82)
 	Unused83               = byte(83)
 	RealmHeroLeftMsg       = byte(84)
@@ -149,6 +149,12 @@ func NewIncomingMessage(id byte) IncomingMessage {
 	case Create:
 		return &CreateMessage{}
 
+	case Move:
+		return &MoveMessage{}
+
+	case UpdateAck:
+		return &UpdateAckMessage{}
+
 	default:
 		return nil
 	}
@@ -198,6 +204,44 @@ func (m *CreateMessage) Read(rdr *NetworkReader) {
 	m.IsChallenger = rdr.ReadBool()
 }
 
+type MoveRecord struct {
+	Time int32
+	X    float32
+	Y    float32
+}
+
+type MoveMessage struct {
+	TickId                        int32
+	Time                          int32
+	ServerRealTimeMSofLastNewTick int32
+	NewX                          float32
+	NewY                          float32
+	MoveRecords                   []MoveRecord
+}
+
+func (m *MoveMessage) Read(rdr *NetworkReader) {
+	m.TickId = rdr.ReadInt()
+	m.Time = rdr.ReadInt()
+	m.ServerRealTimeMSofLastNewTick = rdr.ReadInt()
+	m.NewX = rdr.ReadFloat()
+	m.NewY = rdr.ReadFloat()
+	len := rdr.ReadShort()
+	if len > 0 && len <= 10 {
+		m.MoveRecords = make([]MoveRecord, len)
+		for i := 0; i < int(len); i++ {
+			m.MoveRecords[i] = MoveRecord{
+				Time: rdr.ReadInt(),
+				X:    rdr.ReadFloat(),
+				Y:    rdr.ReadFloat(),
+			}
+		}
+	}
+}
+
+type UpdateAckMessage struct{}
+
+func (m *UpdateAckMessage) Read(rdr *NetworkReader) {}
+
 // Outgoing
 
 func FailureMessage(id int32, message string) []byte {
@@ -225,5 +269,66 @@ func CreateSuccessMessage(objectId int32, characterId int32) []byte {
 	wtr := NewNetworkWriter(CreateSuccess)
 	wtr.WriteInt(objectId)
 	wtr.WriteInt(characterId)
+	return wtr.Buffer()
+}
+
+type UpdateTileData struct {
+	X    int16
+	Y    int16
+	Type uint16
+}
+
+type NewObjectData struct {
+	ObjectType int32
+	ObjectId   int32
+	StatusData StatusData
+}
+
+type StatusData struct {
+	ObjectId int32
+	X        float32
+	Y        float32
+	Stats    []StatData
+}
+
+// todo
+type StatData struct {
+	Type        byte
+	IntValue    int32
+	StringValue string
+}
+
+func UpdateMessage(tiles []UpdateTileData, newObjs []int32, drops []int32) []byte {
+	wtr := NewNetworkWriter(Update)
+
+	length := len(tiles)
+	wtr.WriteCompressedInt(length)
+	for i := 0; i < length; i++ {
+		wtr.WriteShort(tiles[i].X)
+		wtr.WriteShort(tiles[i].Y)
+		wtr.WriteUnsignedShort(tiles[i].Type)
+	}
+
+	length = len(newObjs)
+	wtr.WriteCompressedInt(length)
+	for i := 0; i < length; i++ {
+	}
+
+	length = len(drops)
+	wtr.WriteCompressedInt(length)
+	for i := 0; i < length; i++ {
+		wtr.WriteCompressedInt(int(drops[i]))
+	}
+	return wtr.Buffer()
+}
+
+func NewTickMessage(tickId int32, tickTime int32) []byte {
+	wtr := NewNetworkWriter(Newtick)
+	wtr.WriteInt(tickId)
+	wtr.WriteInt(tickTime)
+	wtr.WriteInt(0)   // serverRealTimeMS_
+	wtr.WriteShort(0) // serverLastRTTMS_
+	wtr.WriteShort(0)
+	// todo status data
 	return wtr.Buffer()
 }

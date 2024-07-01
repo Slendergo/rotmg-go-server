@@ -55,6 +55,14 @@ func NewWorld(id int32, xmlWorld *XMLWorld) *World {
 	return world
 }
 
+func (world *World) InBoundsFloat(x float32, y float32) bool {
+	return x >= 0 && y >= 0 && x < float32(world.Width) && y < float32(world.Height)
+}
+
+func (world *World) InBoundsInt(x int, y int) bool {
+	return x >= 0 && y >= 0 && x < int(world.Width) && y < int(world.Height)
+}
+
 func (world *World) ParseMap() bool {
 	for x := range world.tiles {
 		for y := range world.tiles[x] {
@@ -105,7 +113,9 @@ func (world *World) updatePlayers(dt float64) {
 
 func (world *World) sendNewTick(dt float64) {
 	for _, player := range world.Players {
-		player.Connection.NewTick(dt)
+		if !player.Dead && player.Connection.Connected {
+			player.Connection.NewTick(dt)
+		}
 	}
 }
 

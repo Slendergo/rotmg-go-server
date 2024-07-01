@@ -39,6 +39,12 @@ func (wtr *NetworkWriter) WriteShort(value int16) {
 	wtr.pos += 2
 }
 
+func (wtr *NetworkWriter) WriteUnsignedShort(value uint16) {
+	wtr.ensureCapacity(2)
+	binary.BigEndian.PutUint16(wtr.data[wtr.pos:wtr.pos+2], value)
+	wtr.pos += 2
+}
+
 func (wtr *NetworkWriter) WriteInt(value int32) {
 	wtr.ensureCapacity(4)
 	binary.BigEndian.PutUint32(wtr.data[wtr.pos:wtr.pos+4], uint32(value))
@@ -70,6 +76,33 @@ func (wtr *NetworkWriter) ensureCapacity(needed int) {
 		newData := make([]byte, newCapacity)
 		copy(newData, wtr.data)
 		wtr.data = newData
+	}
+}
+
+func (wtr *NetworkWriter) WriteCompressedInt(value int) {
+	sign := value < 0
+	val := value
+	if sign {
+		val = -val
+	}
+
+	a := byte(val & 0x3F)
+	if val >= 0x40 {
+		a |= 0x80
+	}
+	if sign {
+		a |= 0x40
+	}
+	wtr.WriteByte(a)
+
+	val >>= 6
+	for val > 0 {
+		e := byte(val & 0x7F)
+		if val >= 0x80 {
+			e |= 0x80
+		}
+		wtr.WriteByte(e)
+		val >>= 7
 	}
 }
 

@@ -1,6 +1,9 @@
 package network
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"math"
+)
 
 type NetworkReader struct {
 	data     []byte
@@ -72,6 +75,17 @@ func (rdr *NetworkReader) ReadInt() int32 {
 	}
 	slice := rdr.data[rdr.pos : rdr.pos+4]
 	value := int32(binary.BigEndian.Uint32(slice))
+	rdr.pos += 4
+	return value
+}
+
+func (rdr *NetworkReader) ReadFloat() float32 {
+	if rdr.pos+4 > len(rdr.data) {
+		rdr.setError()
+		return 0.0
+	}
+	slice := rdr.data[rdr.pos : rdr.pos+4]
+	value := math.Float32frombits(binary.BigEndian.Uint32(slice))
 	rdr.pos += 4
 	return value
 }
