@@ -9,7 +9,6 @@ type World struct {
 
 	nextId  int32
 	Players map[int32]*Player
-	Statics map[int32]*Static
 	Enemies map[int32]*Enemy
 
 	elapsed float64
@@ -38,7 +37,6 @@ func NewWorld(id int32, xmlWorld *XMLWorld) *World {
 
 		nextId:  0,
 		Players: make(map[int32]*Player),
-		Statics: make(map[int32]*Static),
 		Enemies: make(map[int32]*Enemy),
 
 		elapsed: 0.0,
@@ -80,6 +78,7 @@ func (world *World) Tick(dt float64) bool {
 	world.elapsed += dt
 	world.updateObjects(dt)
 	world.sendNewTick(dt)
+	world.clearObjectFlags()
 	return true
 }
 
@@ -107,5 +106,15 @@ func (world *World) updatePlayers(dt float64) {
 func (world *World) sendNewTick(dt float64) {
 	for _, player := range world.Players {
 		player.Connection.NewTick(dt)
+	}
+}
+
+func (world *World) clearObjectFlags() {
+	for _, player := range world.Players {
+		player.ClearFlags()
+	}
+
+	for _, enemy := range world.Enemies {
+		enemy.ClearFlags()
 	}
 }

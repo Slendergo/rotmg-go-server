@@ -1,6 +1,8 @@
 package game
 
 import (
+	assets "main/assets/xml"
+	"main/structures"
 	"math"
 )
 
@@ -8,27 +10,29 @@ type Enemy struct {
 	Id        int32
 	MaxHealth int32
 	Health    int32
+	Size      float32
 	Type      int32
 	X         float32
 	Y         float32
 	LastX     float32
 	LastY     float32
 	Flags     int32
-	dead      bool
+	Dead      bool
 }
 
-func NewEnemy(id int32) *Enemy {
+func NewEnemy(xmlEnemy *assets.XMLEnemy, id int32, x float32, y float32) *Enemy {
 	return &Enemy{
 		Id:        id,
-		MaxHealth: 0,
-		Health:    0,
-		Type:      0,
-		X:         0,
-		Y:         0,
-		LastX:     0,
-		LastY:     0,
-		Flags:     0,
-		dead:      false,
+		MaxHealth: xmlEnemy.MaxHitPoints,
+		Health:    xmlEnemy.MaxHitPoints,
+		Size:      float32(xmlEnemy.Size),
+		Type:      xmlEnemy.Type,
+		X:         x,
+		Y:         y,
+		LastX:     x,
+		LastY:     y,
+		Flags:     structures.NoFlags,
+		Dead:      false,
 	}
 }
 
@@ -43,17 +47,26 @@ func (enemy *Enemy) SetPosition(x float32, y float32) {
 	enemy.LastY = enemy.Y
 	enemy.X = x
 	enemy.Y = y
+	enemy.Flags |= structures.MovedFlag
 }
 
 func (enemy *Enemy) Update(dt float64) bool {
-	return !enemy.dead
+	if enemy.Dead {
+		return false
+	}
+
+	// logic
+
+	return !enemy.Dead
 }
 
-func (enemy *Enemy) TakeDamage(damage int32) bool {
-
-	return true
+func (enemy *Enemy) TakeDamage(damage int32) {
 }
 
 func (enemy *Enemy) Kill() {
-	enemy.dead = true
+	enemy.Dead = true
+}
+
+func (enemy *Enemy) ClearFlags() {
+	enemy.Flags &= structures.NoFlags
 }
