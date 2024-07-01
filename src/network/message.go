@@ -278,6 +278,14 @@ type UpdateTileData struct {
 	Type int32
 }
 
+func NewUpdateTileData(x int32, y int32, typ int32) UpdateTileData {
+	return UpdateTileData{
+		X:    x,
+		Y:    y,
+		Type: typ,
+	}
+}
+
 type NewObjectData struct {
 	ObjectType int32
 	StatusData StatusData

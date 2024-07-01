@@ -2,6 +2,7 @@ package game
 
 import (
 	assets "main/assets/xml"
+	"main/network"
 	"main/structures"
 	"math"
 )
@@ -16,7 +17,7 @@ type Enemy struct {
 	Y         float32
 	LastX     float32
 	LastY     float32
-	Flags     int32
+	flags     int32
 	Dead      bool
 }
 
@@ -31,9 +32,26 @@ func NewEnemy(xmlEnemy *assets.XMLEnemy, id int32, x float32, y float32) *Enemy 
 		Y:         y,
 		LastX:     x,
 		LastY:     y,
-		Flags:     structures.NoFlags,
+		flags:     structures.NoFlags,
 		Dead:      false,
 	}
+}
+
+func (enemy *Enemy) NewObjectData() network.NewObjectData {
+	newObjectData := network.NewObjectData{
+		ObjectType: enemy.Type,
+		StatusData: network.StatusData{
+			ObjectId: enemy.Id,
+			X:        enemy.X,
+			Y:        enemy.Y,
+			Stats:    []network.StatData{},
+		},
+	}
+	return newObjectData
+}
+
+func (enemy *Enemy) HasFlag(flag int32) bool {
+	return (enemy.flags & flag) != 0
 }
 
 func (enemy *Enemy) Facing() float32 {
@@ -47,7 +65,7 @@ func (enemy *Enemy) SetPosition(x float32, y float32) {
 	enemy.LastY = enemy.Y
 	enemy.X = x
 	enemy.Y = y
-	enemy.Flags |= structures.MovedFlag
+	enemy.flags |= structures.MovedFlag
 }
 
 func (enemy *Enemy) Update(dt float64) bool {
@@ -68,5 +86,5 @@ func (enemy *Enemy) Kill() {
 }
 
 func (enemy *Enemy) ClearFlags() {
-	enemy.Flags &= structures.NoFlags
+	enemy.flags &= structures.NoFlags
 }

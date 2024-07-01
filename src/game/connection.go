@@ -3,8 +3,17 @@ package game
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"main/network"
+	"main/structures"
+	"main/utils"
 	"net"
+	"time"
+)
+
+const (
+	VisibilityRadius    = int32(15)
+	VisibilityRadiusSqr = int32(VisibilityRadius * VisibilityRadius)
 )
 
 type Connection struct {
@@ -17,7 +26,8 @@ type Connection struct {
 	World  *World
 	Player *Player
 
-	Visibles map[int32]bool
+	Visibles     map[int32]bool
+	VisibleTiles map[int32]bool
 }
 
 func NewConnection(conn net.Conn) *Connection {
@@ -26,7 +36,8 @@ func NewConnection(conn net.Conn) *Connection {
 		Connected: true,
 		incoming:  network.NewNetworkQueue(),
 
-		Visibles: make(map[int32]bool),
+		Visibles:     make(map[int32]bool),
+		VisibleTiles: make(map[int32]bool),
 	}
 }
 
@@ -119,6 +130,10 @@ func (c *Connection) Close(reason string) {
 	}
 	c.Connected = false
 
+	if c.Player != nil {
+		c.Player.Kill()
+	}
+
 	fmt.Printf("Connection was closed: %s\n", reason)
 
 	err := c.conn.Close()
@@ -170,6 +185,7 @@ func (c *Connection) HandleHelloMessage(m *network.HelloMessage) {
 func (c *Connection) HandleLoadMessage(m *network.LoadMessage) {
 
 	c.Player = c.World.CreatePlayer(c, 32.5, 32.5)
+	c.Player.flags = structures.MovedFlag
 
 	c.SendMessage(network.CreateSuccessMessage(c.Player.Id, 0))
 	c.updateSurroundings()
@@ -178,6 +194,7 @@ func (c *Connection) HandleLoadMessage(m *network.LoadMessage) {
 func (c *Connection) HandleCreateMessage(m *network.CreateMessage) {
 
 	c.Player = c.World.CreatePlayer(c, 32.5, 32.5)
+	c.Player.flags = structures.MovedFlag
 
 	c.SendMessage(network.CreateSuccessMessage(c.Player.Id, 0))
 	c.updateSurroundings()
@@ -190,7 +207,9 @@ func (c *Connection) HandleMoveMessage(m *network.MoveMessage) {
 		return
 	}
 
-	c.Player.SetPosition(m.NewX, m.NewY)
+	if c.Player.X != m.NewX || c.Player.Y != m.NewY {
+		c.Player.SetPosition(m.NewX, m.NewY)
+	}
 }
 
 func (c *Connection) HandleUpdateAckMessage(m *network.UpdateAckMessage) {
@@ -216,6 +235,8 @@ func (c *Connection) NewTick(dt float64) {
 
 func (c *Connection) updateSurroundings() {
 
+	start := time.Now()
+
 	var tiles = c.updateTiles()
 	var newObjs = c.updateObjects()
 	var drops = c.updateDrops()
@@ -223,36 +244,42 @@ func (c *Connection) updateSurroundings() {
 	if len(tiles) > 0 || len(newObjs) > 0 || len(drops) > 0 {
 		c.SendMessage(network.UpdateMessage(tiles, newObjs, drops))
 	}
+
+	elapsed := time.Since(start)
+
+	log.Printf("updateSurroundings took %f", elapsed.Seconds())
 }
 
 func (c *Connection) updateTiles() []network.UpdateTileData {
 
 	var tiles []network.UpdateTileData
+	if !c.Player.HasFlag(structures.MovedFlag) {
+		return tiles
+	}
 
 	playerX := c.Player.X
 	playerY := c.Player.Y
 
-	for dx := -15; dx <= 15; dx++ {
-		for dy := -15; dy <= 15; dy++ {
+	for dx := -VisibilityRadius; dx <= VisibilityRadius; dx++ {
+		for dy := -VisibilityRadius; dy <= VisibilityRadius; dy++ {
 
-			if dx*dx+dy*dy > 15*15 {
+			if dx*dx+dy*dy > VisibilityRadiusSqr {
 				continue
 			}
 
 			tileX := int32(playerX + float32(dx))
 			tileY := int32(playerY + float32(dy))
+			posHash := (tileX << 16) | tileY
 
-			if !c.World.InBoundsInt32(tileX, tileY) {
+			if !c.World.InBoundsInt32(tileX, tileY) || c.VisibleTiles[posHash] {
 				continue
 			}
 
 			tile := c.World.tiles[tileX][tileY]
 
-			tiles = append(tiles, network.UpdateTileData{
-				X:    tileX,
-				Y:    tileY,
-				Type: tile.Type,
-			})
+			c.VisibleTiles[posHash] = true
+
+			tiles = append(tiles, network.NewUpdateTileData(tileX, tileY, tile.Type))
 		}
 	}
 	return tiles
@@ -261,27 +288,41 @@ func (c *Connection) updateTiles() []network.UpdateTileData {
 func (c *Connection) updateObjects() []network.NewObjectData {
 	var newObjs []network.NewObjectData
 
-	// hacky way to add player
-	_, ok := c.Visibles[c.Player.Id]
-	if !ok {
-		newObjs = append(newObjs, network.NewObjectData{
-			ObjectType: 0x030e,
-			StatusData: network.StatusData{
-				ObjectId: c.Player.Id,
-				X:        c.Player.X,
-				Y:        c.Player.Y,
-				Stats:    []network.StatData{},
-			},
-		})
-
-		c.Visibles[c.Player.Id] = true
+	// add players
+	for _, player := range c.World.Players {
+		if !player.Dead && !c.Visibles[player.Id] {
+			newObjs = append(newObjs, player.NewObjectData())
+			c.Visibles[player.Id] = true
+		}
 	}
 
+	// add enemies
+	for _, enemy := range c.World.Enemies {
+		if (!enemy.Dead && utils.DistanceSqr(enemy.X, enemy.Y, c.Player.X, c.Player.Y) <= float32(VisibilityRadiusSqr)) && !c.Visibles[enemy.Id] {
+			newObjs = append(newObjs, enemy.NewObjectData())
+			c.Visibles[enemy.Id] = true
+		}
+	}
 	return newObjs
 }
 
 func (c *Connection) updateDrops() []int32 {
 	var drops []int32
 
+	// remove players
+	for _, player := range c.World.Players {
+		if player.Dead && c.Visibles[player.Id] {
+			drops = append(drops, player.Id)
+			c.Visibles[player.Id] = false
+		}
+	}
+
+	// remove enemies
+	for _, enemy := range c.World.Enemies {
+		if (enemy.Dead || utils.DistanceSqr(enemy.X, enemy.Y, c.Player.X, c.Player.Y) > float32(VisibilityRadiusSqr)) && c.Visibles[enemy.Id] {
+			drops = append(drops, enemy.Id)
+			c.Visibles[enemy.Id] = false
+		}
+	}
 	return drops
 }

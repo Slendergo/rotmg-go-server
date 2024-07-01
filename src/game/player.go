@@ -1,6 +1,7 @@
 package game
 
 import (
+	"main/network"
 	"main/structures"
 )
 
@@ -13,7 +14,7 @@ type Player struct {
 	Y          float32
 	LastX      float32
 	LastY      float32
-	Flags      int32
+	flags      int32
 	Dead       bool
 	Connection *Connection
 }
@@ -21,25 +22,42 @@ type Player struct {
 func NewPlayer(connection *Connection, id int32, x float32, y float32) *Player {
 	return &Player{
 		Id:         id,
-		MaxHealth:  0,
-		Health:     0,
+		MaxHealth:  100,
+		Health:     100,
 		Type:       0x030e,
 		X:          x,
 		Y:          y,
 		LastX:      x,
 		LastY:      y,
-		Flags:      structures.NoFlags,
+		flags:      structures.NoFlags,
 		Dead:       false,
 		Connection: connection,
 	}
 }
 
-func (enemy *Player) SetPosition(x float32, y float32) {
-	enemy.LastX = enemy.X
-	enemy.LastY = enemy.Y
-	enemy.X = x
-	enemy.Y = y
-	enemy.Flags |= structures.MovedFlag
+func (player *Player) NewObjectData() network.NewObjectData {
+	newObjectData := network.NewObjectData{
+		ObjectType: player.Type,
+		StatusData: network.StatusData{
+			ObjectId: player.Id,
+			X:        player.X,
+			Y:        player.Y,
+			Stats:    []network.StatData{},
+		},
+	}
+	return newObjectData
+}
+
+func (player *Player) HasFlag(flag int32) bool {
+	return (player.flags & flag) != 0
+}
+
+func (player *Player) SetPosition(x float32, y float32) {
+	player.LastX = player.X
+	player.LastY = player.Y
+	player.X = x
+	player.Y = y
+	player.flags |= structures.MovedFlag
 }
 
 func (player *Player) Update(dt float64) bool {
@@ -64,5 +82,5 @@ func (player *Player) Kill() {
 }
 
 func (player *Player) ClearFlags() {
-	player.Flags = structures.NoFlags
+	player.flags = structures.NoFlags
 }

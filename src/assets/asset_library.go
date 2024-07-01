@@ -40,6 +40,22 @@ func NewAssetLibrary() *AssetLibrary {
 	}
 }
 
+func (al *AssetLibrary) GetXMLEnemy(typ int32) *assets.XMLEnemy {
+	xmlEnemy, ok := al.enemies[typ]
+	if ok {
+		return xmlEnemy
+	}
+	return nil
+}
+
+// func (al *AssetLibrary) GetXMLPlayer(typ int32) *assets.XMLPlayer {
+// 	xmlPlayer, ok := al.players[typ]
+// 	if ok {
+// 		return xmlPlayer
+// 	}
+// 	return nil
+// }
+
 func (al *AssetLibrary) ProcessFiles(directory string) error {
 	startTime := time.Now()
 

@@ -1,5 +1,10 @@
 package game
 
+import (
+	"main/assets"
+	"math/rand"
+)
+
 type World struct {
 	Id          int32
 	Width       int32
@@ -71,7 +76,11 @@ func (world *World) ParseMap() bool {
 	for x := range world.tiles {
 		for y := range world.tiles[x] {
 			tile := world.tiles[x][y]
-			tile.Type = 0x36
+			if rand.Float32() > 0.9 {
+				tile.Type = 0x36
+			} else {
+				tile.Type = 0x34
+			}
 		}
 	}
 	return true
@@ -84,6 +93,20 @@ func (world *World) CreatePlayer(connection *Connection, x float32, y float32) *
 	player := NewPlayer(connection, nextId, x, y)
 	world.Players[nextId] = player
 	return player
+}
+
+func (world *World) CreateEnemy(typ int32, x float32, y float32) *Enemy {
+	nextId := world.nextId
+	world.nextId++
+
+	xmlEnemy := assets.GlobalAssetLibrary.GetXMLEnemy(0x600)
+	if xmlEnemy == nil {
+		return nil
+	}
+
+	enemy := NewEnemy(xmlEnemy, nextId, x, y)
+	world.Enemies[nextId] = enemy
+	return enemy
 }
 
 func (world *World) Tick(dt float64) bool {
