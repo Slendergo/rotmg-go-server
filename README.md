@@ -23,7 +23,7 @@ This project uses the following third-party packages:
 
 - [etree](https://github.com/beevik/etree) - A lightweight element tree XML parser.
 
-## Licenses
+## licenses
 
 This project includes third-party software governed by the following licenses:
 
