@@ -63,6 +63,10 @@ func (world *World) InBoundsInt(x int, y int) bool {
 	return x >= 0 && y >= 0 && x < int(world.Width) && y < int(world.Height)
 }
 
+func (world *World) InBoundsInt32(x int32, y int32) bool {
+	return x >= 0 && y >= 0 && x < world.Width && y < world.Height
+}
+
 func (world *World) ParseMap() bool {
 	for x := range world.tiles {
 		for y := range world.tiles[x] {

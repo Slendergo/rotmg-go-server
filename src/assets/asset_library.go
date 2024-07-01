@@ -54,7 +54,6 @@ func (al *AssetLibrary) ProcessFiles(directory string) error {
 				if err != nil {
 					return fmt.Errorf("error processing XML file %s: %v", path, err)
 				}
-				fmt.Printf("XML's loaded from %s\n", path)
 			}
 		}
 		return nil

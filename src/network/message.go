@@ -273,14 +273,13 @@ func CreateSuccessMessage(objectId int32, characterId int32) []byte {
 }
 
 type UpdateTileData struct {
-	X    int16
-	Y    int16
-	Type uint16
+	X    int32
+	Y    int32
+	Type int32
 }
 
 type NewObjectData struct {
 	ObjectType int32
-	ObjectId   int32
 	StatusData StatusData
 }
 
@@ -298,20 +297,25 @@ type StatData struct {
 	StringValue string
 }
 
-func UpdateMessage(tiles []UpdateTileData, newObjs []int32, drops []int32) []byte {
+func UpdateMessage(tiles []UpdateTileData, newObjs []NewObjectData, drops []int32) []byte {
 	wtr := NewNetworkWriter(Update)
 
 	length := len(tiles)
 	wtr.WriteCompressedInt(length)
 	for i := 0; i < length; i++ {
-		wtr.WriteShort(tiles[i].X)
-		wtr.WriteShort(tiles[i].Y)
-		wtr.WriteUnsignedShort(tiles[i].Type)
+		wtr.WriteShort(int16(tiles[i].X))
+		wtr.WriteShort(int16(tiles[i].Y))
+		wtr.WriteUnsignedShort(uint16(tiles[i].Type))
 	}
 
 	length = len(newObjs)
 	wtr.WriteCompressedInt(length)
 	for i := 0; i < length; i++ {
+		wtr.WriteUnsignedShort(uint16(newObjs[i].ObjectType))
+		wtr.WriteCompressedInt(int(newObjs[i].StatusData.ObjectId))
+		wtr.WriteFloat(newObjs[i].StatusData.X)
+		wtr.WriteFloat(newObjs[i].StatusData.Y)
+		wtr.WriteCompressedInt(0) // StatData
 	}
 
 	length = len(drops)

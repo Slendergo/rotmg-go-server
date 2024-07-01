@@ -1,6 +1,9 @@
 package network
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"math"
+)
 
 type NetworkWriter struct {
 	data []byte
@@ -48,6 +51,12 @@ func (wtr *NetworkWriter) WriteUnsignedShort(value uint16) {
 func (wtr *NetworkWriter) WriteInt(value int32) {
 	wtr.ensureCapacity(4)
 	binary.BigEndian.PutUint32(wtr.data[wtr.pos:wtr.pos+4], uint32(value))
+	wtr.pos += 4
+}
+
+func (wtr *NetworkWriter) WriteFloat(value float32) {
+	wtr.ensureCapacity(4)
+	binary.BigEndian.PutUint32(wtr.data[wtr.pos:wtr.pos+4], math.Float32bits(value))
 	wtr.pos += 4
 }
 

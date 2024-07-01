@@ -16,6 +16,8 @@ type Connection struct {
 	tickId int32
 	World  *World
 	Player *Player
+
+	Visibles map[int32]bool
 }
 
 func NewConnection(conn net.Conn) *Connection {
@@ -23,6 +25,8 @@ func NewConnection(conn net.Conn) *Connection {
 		conn:      conn,
 		Connected: true,
 		incoming:  network.NewNetworkQueue(),
+
+		Visibles: make(map[int32]bool),
 	}
 }
 
@@ -72,7 +76,6 @@ func (c *Connection) HandleMessages() bool {
 	defer c.incoming.Unlock()
 
 	for c.incoming.Size() > 0 {
-
 		message := c.incoming.Pop()
 		err := c.HandleMessage(message)
 		if err != nil {
@@ -169,6 +172,7 @@ func (c *Connection) HandleLoadMessage(m *network.LoadMessage) {
 	c.Player = c.World.CreatePlayer(c, 32.5, 32.5)
 
 	c.SendMessage(network.CreateSuccessMessage(c.Player.Id, 0))
+	c.updateSurroundings()
 }
 
 func (c *Connection) HandleCreateMessage(m *network.CreateMessage) {
@@ -176,6 +180,7 @@ func (c *Connection) HandleCreateMessage(m *network.CreateMessage) {
 	c.Player = c.World.CreatePlayer(c, 32.5, 32.5)
 
 	c.SendMessage(network.CreateSuccessMessage(c.Player.Id, 0))
+	c.updateSurroundings()
 }
 
 func (c *Connection) HandleMoveMessage(m *network.MoveMessage) {
@@ -202,43 +207,81 @@ func (c *Connection) SendMessage(data []byte) {
 // Server State
 
 func (c *Connection) NewTick(dt float64) {
-
 	c.updateSurroundings()
 
 	c.tickId++
 	tickTime := int32(dt * 1000.0)
 	c.SendMessage(network.NewTickMessage(c.tickId, tickTime))
-
-	fmt.Println("TickTime:", tickTime)
 }
 
 func (c *Connection) updateSurroundings() {
-	playerX := c.Player.X
-	playerY := c.Player.Y
+
+	var tiles = c.updateTiles()
+	var newObjs = c.updateObjects()
+	var drops = c.updateDrops()
+
+	if len(tiles) > 0 || len(newObjs) > 0 || len(drops) > 0 {
+		c.SendMessage(network.UpdateMessage(tiles, newObjs, drops))
+	}
+}
+
+func (c *Connection) updateTiles() []network.UpdateTileData {
 
 	var tiles []network.UpdateTileData
 
-	maxDistance := 15 * 15
+	playerX := c.Player.X
+	playerY := c.Player.Y
 
 	for dx := -15; dx <= 15; dx++ {
 		for dy := -15; dy <= 15; dy++ {
 
-			if dx*dx+dy*dy >= maxDistance {
+			if dx*dx+dy*dy > 15*15 {
 				continue
 			}
 
-			tileX := int(playerX + float32(dx))
-			tileY := int(playerY + float32(dy))
+			tileX := int32(playerX + float32(dx))
+			tileY := int32(playerY + float32(dy))
 
-			if !c.World.InBoundsInt(tileX, tileY) {
+			if !c.World.InBoundsInt32(tileX, tileY) {
 				continue
 			}
 
 			tile := c.World.tiles[tileX][tileY]
 
-			tiles = append(tiles, network.UpdateTileData{X: int16(tileX), Y: int16(tileY), Type: uint16(tile.Type)})
+			tiles = append(tiles, network.UpdateTileData{
+				X:    tileX,
+				Y:    tileY,
+				Type: tile.Type,
+			})
 		}
 	}
+	return tiles
+}
 
-	c.SendMessage(network.UpdateMessage(tiles, []int32{}, []int32{}))
+func (c *Connection) updateObjects() []network.NewObjectData {
+	var newObjs []network.NewObjectData
+
+	// hacky way to add player
+	_, ok := c.Visibles[c.Player.Id]
+	if !ok {
+		newObjs = append(newObjs, network.NewObjectData{
+			ObjectType: 0x030e,
+			StatusData: network.StatusData{
+				ObjectId: c.Player.Id,
+				X:        c.Player.X,
+				Y:        c.Player.Y,
+				Stats:    []network.StatData{},
+			},
+		})
+
+		c.Visibles[c.Player.Id] = true
+	}
+
+	return newObjs
+}
+
+func (c *Connection) updateDrops() []int32 {
+	var drops []int32
+
+	return drops
 }
