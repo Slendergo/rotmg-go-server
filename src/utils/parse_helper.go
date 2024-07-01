@@ -11,7 +11,7 @@ func ParseHexInt32D(hex string, defaultValue int32) int32 {
 		return defaultValue
 	}
 
-	intType, err := strconv.ParseInt(hex[2:], 16, 32) // Parse starting from index 2 (skip "0x")
+	intType, err := strconv.ParseInt(hex[2:], 16, 32)
 	if err != nil {
 		return defaultValue
 	}
@@ -28,7 +28,7 @@ func ParseHexInt64D(hex string, defaultValue int64) int64 {
 		return defaultValue
 	}
 
-	intType, err := strconv.ParseInt(hex[2:], 16, 64) // Parse starting from index 2 (skip "0x")
+	intType, err := strconv.ParseInt(hex[2:], 16, 64)
 	if err != nil {
 		return defaultValue
 	}

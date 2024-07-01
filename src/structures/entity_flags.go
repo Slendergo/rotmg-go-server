@@ -1,4 +1,4 @@
-package game
+package structures
 
 // Entity Flags
 const (

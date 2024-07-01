@@ -1,5 +1,5 @@
 # rotmg-go
-A go server emulation of rotmg
+A go gameserver emulation of rotmg for v1.0.3.0 
 
 I decided to learn go language so i made this as a project to practice with
 
@@ -21,7 +21,7 @@ I decided to learn go language so i made this as a project to practice with
 
 This project uses the following third-party packages:
 
-- [etree](https://github.com/beevik/etree) - A lightweight element tree XML parser.
+- [etree](https://github.com/beevik/etree) - A lightweight element tree XML parser
 
 ## licenses
 
