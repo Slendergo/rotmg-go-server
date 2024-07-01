@@ -27,4 +27,4 @@ This project uses the following third-party packages:
 
 This project includes third-party software governed by the following licenses:
 
-- `etree` - A lightweight element tree XML parser: [etree License](licenses/etree/LICENSE)
+- `etree` - A lightweight element tree XML parser: [etree License](licenses/etree_LICENSE)
