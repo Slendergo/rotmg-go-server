@@ -15,11 +15,21 @@ func main() {
 		resourcesPath = os.Args[1]
 	}
 
-	assets.GlobalAssetLibrary = assets.NewAssetLibrary()
+	xmlResourcePath := resourcesPath + "/xml"
 
-	err := assets.GlobalAssetLibrary.ProcessFiles(resourcesPath)
+	assets.GlobalXMLLibrary = assets.NewXMLLibrary()
+	err := assets.GlobalXMLLibrary.ProcessFiles(xmlResourcePath)
 	if err != nil {
-		fmt.Printf("Error processing XML files: %s | %s", resourcesPath, err)
+		fmt.Printf("Error processing XML files: %s | %s", xmlResourcePath, err)
+		return
+	}
+
+	jmResourcePath := resourcesPath + "/jms"
+
+	assets.GlobalMapLibrary = assets.NewMapLibrary()
+	err = assets.GlobalMapLibrary.ProcessFiles(jmResourcePath)
+	if err != nil {
+		fmt.Printf("Error processing Map files: %s | %s", jmResourcePath, err)
 		return
 	}
 

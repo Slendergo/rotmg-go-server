@@ -323,7 +323,14 @@ func UpdateMessage(tiles []UpdateTileData, newObjs []NewObjectData, drops []int3
 		wtr.WriteCompressedInt(int(newObjs[i].StatusData.ObjectId))
 		wtr.WriteFloat(newObjs[i].StatusData.X)
 		wtr.WriteFloat(newObjs[i].StatusData.Y)
-		wtr.WriteCompressedInt(0) // StatData
+
+		statLength := len(newObjs[i].StatusData.Stats)
+		wtr.WriteCompressedInt(statLength) // StatData
+		for j := 0; j < statLength; j++ {
+			wtr.WriteByte(newObjs[i].StatusData.Stats[j].Type)
+			wtr.WriteCompressedInt(int(newObjs[i].StatusData.Stats[j].IntValue))
+			// wtr.WriteString(newObjs[j].StatusData.Stats[j].StringValue)
+		}
 	}
 
 	length = len(drops)

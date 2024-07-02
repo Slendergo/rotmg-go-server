@@ -34,8 +34,8 @@ func (manager *WorldManager) CreateWorld(idName string) *World {
 
 	xmlWorld := &XMLWorld{
 		IdName:      idName,
-		Width:       64,
-		Height:      64,
+		Width:       128,
+		Height:      128,
 		DisplayName: idName,
 	}
 

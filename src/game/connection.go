@@ -3,17 +3,17 @@ package game
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"main/network"
 	"main/structures"
 	"main/utils"
 	"net"
-	"time"
 )
 
 const (
-	VisibilityRadius    = int32(15)
-	VisibilityRadiusSqr = int32(VisibilityRadius * VisibilityRadius)
+	ViewRadius         = int32(15)
+	ViewRadiusSqr      = int32(ViewRadius * ViewRadius)
+	ViewRadiusFloat    = float32(ViewRadius)
+	ViewRadiusSqrFloat = float32(ViewRadius * ViewRadius)
 )
 
 type Connection struct {
@@ -28,6 +28,7 @@ type Connection struct {
 
 	Visibles     map[int32]bool
 	VisibleTiles map[int32]bool
+	currentTiles map[int32]bool
 }
 
 func NewConnection(conn net.Conn) *Connection {
@@ -38,6 +39,7 @@ func NewConnection(conn net.Conn) *Connection {
 
 		Visibles:     make(map[int32]bool),
 		VisibleTiles: make(map[int32]bool),
+		currentTiles: make(map[int32]bool),
 	}
 }
 
@@ -184,7 +186,7 @@ func (c *Connection) HandleHelloMessage(m *network.HelloMessage) {
 
 func (c *Connection) HandleLoadMessage(m *network.LoadMessage) {
 
-	c.Player = c.World.CreatePlayer(c, 32.5, 32.5)
+	c.Player = c.World.CreatePlayer(c, float32(c.World.Width/2.0), float32(c.World.Height/2.0))
 	c.Player.flags = structures.MovedFlag
 
 	c.SendMessage(network.CreateSuccessMessage(c.Player.Id, 0))
@@ -193,7 +195,7 @@ func (c *Connection) HandleLoadMessage(m *network.LoadMessage) {
 
 func (c *Connection) HandleCreateMessage(m *network.CreateMessage) {
 
-	c.Player = c.World.CreatePlayer(c, 32.5, 32.5)
+	c.Player = c.World.CreatePlayer(c, float32(c.World.Width/2.0), float32(c.World.Height/2.0))
 	c.Player.flags = structures.MovedFlag
 
 	c.SendMessage(network.CreateSuccessMessage(c.Player.Id, 0))
@@ -235,8 +237,6 @@ func (c *Connection) NewTick(dt float64) {
 
 func (c *Connection) updateSurroundings() {
 
-	start := time.Now()
-
 	var tiles = c.updateTiles()
 	var newObjs = c.updateObjects()
 	var drops = c.updateDrops()
@@ -244,10 +244,6 @@ func (c *Connection) updateSurroundings() {
 	if len(tiles) > 0 || len(newObjs) > 0 || len(drops) > 0 {
 		c.SendMessage(network.UpdateMessage(tiles, newObjs, drops))
 	}
-
-	elapsed := time.Since(start)
-
-	log.Printf("updateSurroundings took %f", elapsed.Seconds())
 }
 
 func (c *Connection) updateTiles() []network.UpdateTileData {
@@ -257,20 +253,25 @@ func (c *Connection) updateTiles() []network.UpdateTileData {
 		return tiles
 	}
 
-	playerX := c.Player.X
-	playerY := c.Player.Y
+	playerX := int32(c.Player.X)
+	playerY := int32(c.Player.Y)
 
-	for dx := -VisibilityRadius; dx <= VisibilityRadius; dx++ {
-		for dy := -VisibilityRadius; dy <= VisibilityRadius; dy++ {
+	for k := range c.currentTiles {
+		delete(c.currentTiles, k)
+	}
 
-			if dx*dx+dy*dy > VisibilityRadiusSqr {
+	for dx := -ViewRadius; dx <= ViewRadius; dx++ {
+		for dy := -ViewRadius; dy <= ViewRadius; dy++ {
+
+			if dx*dx+dy*dy > ViewRadiusSqr {
 				continue
 			}
 
-			tileX := int32(playerX + float32(dx))
-			tileY := int32(playerY + float32(dy))
+			tileX := playerX + int32(dx)
+			tileY := playerY + int32(dy)
 			posHash := (tileX << 16) | tileY
 
+			c.currentTiles[posHash] = true
 			if !c.World.InBoundsInt32(tileX, tileY) || c.VisibleTiles[posHash] {
 				continue
 			}
@@ -290,18 +291,45 @@ func (c *Connection) updateObjects() []network.NewObjectData {
 
 	// add players
 	for _, player := range c.World.Players {
-		if !player.Dead && !c.Visibles[player.Id] {
-			newObjs = append(newObjs, player.NewObjectData())
-			c.Visibles[player.Id] = true
+		if player.Dead {
+			continue
 		}
+
+		if c.Visibles[player.Id] {
+			continue
+		}
+
+		newObjs = append(newObjs, player.NewObjectData())
+		c.Visibles[player.Id] = true
 	}
 
-	// add enemies
-	for _, enemy := range c.World.Enemies {
-		if (!enemy.Dead && utils.DistanceSqr(enemy.X, enemy.Y, c.Player.X, c.Player.Y) <= float32(VisibilityRadiusSqr)) && !c.Visibles[enemy.Id] {
-			newObjs = append(newObjs, enemy.NewObjectData())
-			c.Visibles[enemy.Id] = true
+	// add entities
+	for _, entity := range c.World.Entities {
+		if entity.Dead {
+			continue
 		}
+
+		if c.Visibles[entity.Id] {
+			continue
+		}
+
+		// this is because statics are suppose to be based on the tile's center
+		// without this a distance check would make a static entity that should be visible on a tile you see dissapear because it may be just out of view distance causing visual "bugs"
+		if entity.ObjectProps.IsStatic {
+			posHash := (int32(entity.X) << 16) | int32(entity.Y)
+			if !c.currentTiles[posHash] {
+				continue
+			}
+		} else {
+			// any other entity is distance checked because they dont occupy the tile
+			dist := utils.Distance(c.Player.X, c.Player.Y, entity.X, entity.Y)
+			if dist > ViewRadiusFloat {
+				continue
+			}
+		}
+
+		newObjs = append(newObjs, entity.NewObjectData())
+		c.Visibles[entity.Id] = true
 	}
 	return newObjs
 }
@@ -311,17 +339,29 @@ func (c *Connection) updateDrops() []int32 {
 
 	// remove players
 	for _, player := range c.World.Players {
-		if player.Dead && c.Visibles[player.Id] {
-			drops = append(drops, player.Id)
-			c.Visibles[player.Id] = false
+		if !player.Dead {
+			continue
 		}
+
+		if !c.Visibles[player.Id] {
+			continue
+		}
+
+		drops = append(drops, player.Id)
+		delete(c.Visibles, player.Id)
 	}
 
-	// remove enemies
-	for _, enemy := range c.World.Enemies {
-		if (enemy.Dead || utils.DistanceSqr(enemy.X, enemy.Y, c.Player.X, c.Player.Y) > float32(VisibilityRadiusSqr)) && c.Visibles[enemy.Id] {
-			drops = append(drops, enemy.Id)
-			c.Visibles[enemy.Id] = false
+	// remove entities
+	for _, entity := range c.World.Entities {
+
+		if !c.Visibles[entity.Id] {
+			continue
+		}
+
+		dist := utils.Distance(c.Player.X, c.Player.Y, entity.X, entity.Y)
+		if entity.Dead || dist > ViewRadiusFloat {
+			drops = append(drops, entity.Id)
+			delete(c.Visibles, entity.Id)
 		}
 	}
 	return drops

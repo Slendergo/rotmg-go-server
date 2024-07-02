@@ -12,9 +12,9 @@ import (
 	"github.com/beevik/etree"
 )
 
-var GlobalAssetLibrary *AssetLibrary
+var GlobalXMLLibrary *XMLLibrary
 
-type AssetLibrary struct {
+type XMLLibrary struct {
 	objectIdToType   map[string]int32
 	objectTypeToId   map[int32]string
 	objectProperties map[int32]*assets.XMLObjectProperties
@@ -27,8 +27,8 @@ type AssetLibrary struct {
 	groundProperties map[int32]*assets.XMLGround
 }
 
-func NewAssetLibrary() *AssetLibrary {
-	return &AssetLibrary{
+func NewXMLLibrary() *XMLLibrary {
+	return &XMLLibrary{
 		objectIdToType:   make(map[string]int32),
 		objectTypeToId:   make(map[int32]string),
 		objectProperties: make(map[int32]*assets.XMLObjectProperties),
@@ -40,7 +40,7 @@ func NewAssetLibrary() *AssetLibrary {
 	}
 }
 
-func (al *AssetLibrary) GetXMLEnemy(typ int32) *assets.XMLEnemy {
+func (al *XMLLibrary) GetXMLEnemy(typ int32) *assets.XMLEnemy {
 	xmlEnemy, ok := al.enemies[typ]
 	if ok {
 		return xmlEnemy
@@ -56,7 +56,7 @@ func (al *AssetLibrary) GetXMLEnemy(typ int32) *assets.XMLEnemy {
 // 	return nil
 // }
 
-func (al *AssetLibrary) ProcessFiles(directory string) error {
+func (al *XMLLibrary) ProcessFiles(directory string) error {
 	startTime := time.Now()
 
 	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
@@ -86,7 +86,7 @@ func (al *AssetLibrary) ProcessFiles(directory string) error {
 	return nil
 }
 
-func (al *AssetLibrary) processXMLFile(filePath string) error {
+func (al *XMLLibrary) processXMLFile(filePath string) error {
 
 	doc := etree.NewDocument()
 	err := doc.ReadFromFile(filePath)
@@ -137,7 +137,7 @@ func (al *AssetLibrary) processXMLFile(filePath string) error {
 		return nil
 	}
 
-	root = doc.SelectElement("Grounds")
+	root = doc.SelectElement("GroundTypes")
 	if root != nil {
 
 		for _, elem := range root.SelectElements("Ground") {
@@ -166,23 +166,23 @@ func (al *AssetLibrary) processXMLFile(filePath string) error {
 	return nil
 }
 
-func (al *AssetLibrary) IdFromType(typ int32, defaultValue string) string {
+func (al *XMLLibrary) IdFromType(typ int32) string {
 	idName, ok := al.objectTypeToId[typ]
 	if ok {
 		return idName
 	}
-	return defaultValue
+	return ""
 }
 
-func (al *AssetLibrary) TypeFromId(idName string, defaultValue int32) int32 {
+func (al *XMLLibrary) TypeFromId(idName string) int32 {
 	typ, ok := al.objectIdToType[idName]
 	if ok {
 		return typ
 	}
-	return defaultValue
+	return -1
 }
 
-func (al *AssetLibrary) GetXMLObjectProperties(typ int32) *assets.XMLObjectProperties {
+func (al *XMLLibrary) GetXMLObjectProperties(typ int32) *assets.XMLObjectProperties {
 	xmlObjectProperties, ok := al.objectProperties[typ]
 	if ok {
 		return xmlObjectProperties
@@ -190,23 +190,23 @@ func (al *AssetLibrary) GetXMLObjectProperties(typ int32) *assets.XMLObjectPrope
 	return nil
 }
 
-func (al *AssetLibrary) GroundIdFromType(typ int32, defaultValue string) string {
+func (al *XMLLibrary) GroundIdFromType(typ int32) string {
 	idName, ok := al.groundTypeToId[typ]
 	if ok {
 		return idName
 	}
-	return defaultValue
+	return ""
 }
 
-func (al *AssetLibrary) GroundTypeFromId(idName string, defaultValue int32) int32 {
+func (al *XMLLibrary) GroundTypeFromId(idName string) int32 {
 	typ, ok := al.groundIdToType[idName]
 	if ok {
 		return typ
 	}
-	return defaultValue
+	return 0xff
 }
 
-func (al *AssetLibrary) GetXMLGround(typ int32) *assets.XMLGround {
+func (al *XMLLibrary) GetXMLGround(typ int32) *assets.XMLGround {
 	xmlGround, ok := al.groundProperties[typ]
 	if ok {
 		return xmlGround
