@@ -7,15 +7,19 @@ I decided to learn go language so i made this as a project to practice with
 - XML Parsing
 - Multiple Connections
 - Message Handling and Sending
+- Map Parsing
+- Basic Entity System 
+- Basic Update Logic (Update, NewTick and Move)
 
 # Current Todo
-- Player State Update at end of World Tick (Update, NewTick, Move)
-- Map Parsing
-- Entity Creation
+- A System to Update Stats
+- Remove hardcoded logic and make everything dynamic (Load World from name with XMLWorld)
 
 # Possible Future Features
+- Better Entity System
 - Shooting
 - Database
+- Implement validation and tracking of Players client state
 
 ## Dependencies
 This project uses the following third-party packages:
