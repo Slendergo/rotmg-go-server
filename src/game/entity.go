@@ -28,6 +28,11 @@ type Entity struct {
 }
 
 func NewEntity(objectProps *xml.XMLObjectProperties, id int32, x float32, y float32) *Entity {
+
+	if objectProps.IsPlayer {
+		return nil
+	}
+
 	entity :=
 		&Entity{
 			Id:          id,
@@ -43,10 +48,11 @@ func NewEntity(objectProps *xml.XMLObjectProperties, id int32, x float32, y floa
 		}
 
 	if objectProps.IsEnemy {
-		xmlEnemy := assets.GlobalXMLLibrary.GetXMLEnemy(objectProps.Type)
+		entity.XMLEnemy = assets.GlobalXMLLibrary.GetXMLEnemy(objectProps.Type)
 
-		entity.MaxHealth = xmlEnemy.MaxHitPoints
-		entity.Health = xmlEnemy.MaxHitPoints
+		entity.MaxHealth = entity.XMLEnemy.MaxHitPoints
+		entity.Health = entity.XMLEnemy.MaxHitPoints
+		entity.Size = float32(entity.XMLEnemy.Size)
 	}
 
 	return entity

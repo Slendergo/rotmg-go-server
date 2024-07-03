@@ -21,7 +21,8 @@ type World struct {
 }
 
 type Tile struct {
-	Type int32
+	Type         int32
+	StaticEntity Entity
 }
 
 type XMLWorld struct {
@@ -116,11 +117,16 @@ func (world *World) ParseMap() bool {
 	return true
 }
 
-func (world *World) CreatePlayer(connection *Connection, x float32, y float32) *Player {
+func (world *World) CreatePlayer(connection *Connection, typ int32, x float32, y float32) *Player {
 	nextId := world.nextEntityId
 	world.nextEntityId++
 
-	player := NewPlayer(connection, nextId, x, y)
+	props := assets.GlobalXMLLibrary.GetXMLObjectProperties(typ)
+	if props == nil {
+		return nil
+	}
+
+	player := NewPlayer(connection, props, nextId, x, y)
 	world.Players[nextId] = player
 	return player
 }

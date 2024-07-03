@@ -1,38 +1,48 @@
 package game
 
 import (
+	xml "main/assets/xml"
 	"main/network"
 	"main/structures"
 )
 
 type Player struct {
-	Id         int32
-	MaxHealth  int32
-	Health     int32
-	Type       int32
-	X          float32
-	Y          float32
-	LastX      float32
-	LastY      float32
-	flags      int32
-	Dead       bool
+	Id        int32
+	MaxHealth int32
+	Health    int32
+	Type      int32
+	X         float32
+	Y         float32
+	LastX     float32
+	LastY     float32
+	flags     int32
+
+	// XMLPlayer   *xml.XMLPlayer
+	ObjectProps *xml.XMLObjectProperties
+	Dead        bool
+
 	Connection *Connection
 }
 
-func NewPlayer(connection *Connection, id int32, x float32, y float32) *Player {
-	return &Player{
-		Id:         id,
-		MaxHealth:  100,
-		Health:     100,
-		Type:       0x030e,
-		X:          x,
-		Y:          y,
-		LastX:      x,
-		LastY:      y,
-		flags:      structures.NoFlags,
-		Dead:       false,
-		Connection: connection,
+func NewPlayer(connection *Connection, objectProps *xml.XMLObjectProperties, id int32, x float32, y float32) *Player {
+
+	player := &Player{
+		Id:        id,
+		MaxHealth: 100,
+		Health:    100,
+		Type:      0x030e,
+		X:         x,
+		Y:         y,
+		LastX:     x,
+		LastY:     y,
+		flags:     structures.NoFlags,
+
+		ObjectProps: objectProps,
+		Dead:        false,
+		Connection:  connection,
 	}
+
+	return player
 }
 
 func (player *Player) NewObjectData() network.NewObjectData {
